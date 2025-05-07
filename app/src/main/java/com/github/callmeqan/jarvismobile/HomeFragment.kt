@@ -9,7 +9,10 @@ import android.widget.Button
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 class HomeFragment : Fragment() {
 
     private lateinit var speechRecognizerHelper: SpeechRecognizerHelper
@@ -31,7 +34,11 @@ class HomeFragment : Fragment() {
         // Initialize the adapter
         chatAdapter = ChatAdapter(messages)
         recyclerView.adapter = chatAdapter
-
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+        }
         // Mic button
         val micButton: Button = binding.root.findViewById(R.id.mic_button)
 
@@ -50,11 +57,14 @@ class HomeFragment : Fragment() {
     }
 
     private fun handleSpeechRecognitionResult(result: String) {
-        // Add recognized text to the RecyclerView
-        messages.add("You said: $result")  // Add the new message to the list
-        chatAdapter.addMessage("You said: $result")  // Update the RecyclerView with the new message
-        recyclerView.scrollToPosition(messages.size - 1)  // Scroll to the latest message
+        val message = "You said: $result"
+        println(message)  // This logs it to Logcat
+
+        messages.add(message)  // Add to message list
+        chatAdapter.notifyItemInserted(messages.size - 1)  // Notify adapter
+        recyclerView.scrollToPosition(messages.size - 1)  // Auto-scroll
     }
+
 
 
     override fun onResume() {
