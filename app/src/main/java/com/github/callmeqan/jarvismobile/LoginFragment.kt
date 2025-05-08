@@ -5,6 +5,10 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
 
 // TODO: Rename parameter arguments, choose names that match
 // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
@@ -21,6 +25,11 @@ class LoginFragment : Fragment() {
     private var param1: String? = null
     private var param2: String? = null
 
+    private lateinit var emailInput: EditText
+    private lateinit var passwordInput: EditText
+    private lateinit var loginButton: Button
+    private lateinit var signupLink: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         arguments?.let {
@@ -33,8 +42,34 @@ class LoginFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_login, container, false)
+        val view = inflater.inflate(R.layout.fragment_login, container, false)
+
+        // Initialize UI elements
+        emailInput = view.findViewById(R.id.email_input)
+        passwordInput = view.findViewById(R.id.password_input)
+        loginButton = view.findViewById(R.id.login_button)
+        signupLink = view.findViewById(R.id.signup_link)
+
+        // Set up login button click listener
+        loginButton.setOnClickListener {
+            val email = emailInput.text.toString()
+            val password = passwordInput.text.toString()
+
+            if (email.isNotBlank() && password.isNotBlank()) {
+                // Handle login logic here
+                Toast.makeText(requireContext(), "Logging in...", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), "Please fill in all fields", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Set up signup link click listener
+        signupLink.setOnClickListener {
+            // Navigate to signup screen or handle signup logic
+            Toast.makeText(requireContext(), "Navigating to signup...", Toast.LENGTH_SHORT).show()
+        }
+
+        return view
     }
 
     companion object {

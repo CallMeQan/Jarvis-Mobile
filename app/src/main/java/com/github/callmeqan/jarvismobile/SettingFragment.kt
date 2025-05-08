@@ -3,7 +3,10 @@ package com.github.callmeqan.jarvismobile
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,9 +16,12 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.github.callmeqan.jarvismobile.databinding.FragmentSettingBinding
 
 class SettingFragment : Fragment() {
@@ -26,9 +32,9 @@ class SettingFragment : Fragment() {
             val action = intent.action
             if (BluetoothDevice.ACTION_FOUND == action) {
                 val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                val deviceName = device?.name
-                val deviceAddress = device?.address // MAC address of the device
-                println("Found device: $deviceName, $deviceAddress")
+                if (device != null) {
+                    connectToDevice(device)
+                }
             }
         }
     }
@@ -71,6 +77,29 @@ class SettingFragment : Fragment() {
         return binding.root
     }
 
+    private fun connectToDevice(device: BluetoothDevice) {
+        val gatt = device.connectGatt(requireContext(), false, object : BluetoothGattCallback() {
+            override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    println("Connected to ${device.name}")
+                    gatt.discoverServices()
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    println("Disconnected from ${device.name}")
+                }
+            }
+
+            override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    println("Services discovered on ${device.name}")
+                }
+            }
+        })
+
+        // Save the device address in SharedPreferences
+        val sharedPreferences = requireContext().getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+        sharedPreferences.edit().putString("paired_device", device.address).apply()
+    }
+
     private fun setupBluetooth() {
         val bluetoothManager = requireContext().getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
@@ -86,6 +115,7 @@ class SettingFragment : Fragment() {
         bluetoothAdapter.startDiscovery()
         isReceiverRegistered = true // Set flag to true when receiver is registered
     }
+
     // Handle permission request result
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
@@ -101,6 +131,7 @@ class SettingFragment : Fragment() {
             }
         }
     }
+
     override fun onDestroy() {
         super.onDestroy()
 
@@ -110,6 +141,4 @@ class SettingFragment : Fragment() {
             isReceiverRegistered = false // Reset the flag
         }
     }
-
-
 }
