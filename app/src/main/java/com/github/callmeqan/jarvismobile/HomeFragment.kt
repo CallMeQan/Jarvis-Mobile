@@ -173,7 +173,7 @@ class HomeFragment : Fragment() {
                 outputStream?.write(message.toByteArray())
 
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(requireContext(), "Message sent: $message", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(),
                 }
             } catch (e: IOException) {
                 Handler(Looper.getMainLooper()).post {
