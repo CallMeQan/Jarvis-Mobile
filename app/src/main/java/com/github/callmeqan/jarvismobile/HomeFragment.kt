@@ -23,6 +23,12 @@ import android.bluetooth.BluetoothProfile
 import java.util.UUID
 import android.speech.SpeechRecognizer
 import com.airbnb.lottie.LottieAnimationView
+import android.bluetooth.BluetoothSocket
+import android.os.Handler
+import android.os.Looper
+import java.io.IOException
+import kotlin.concurrent.thread
+import com.github.callmeqan.jarvismobile.BluetoothConnectionManager
 
 class HomeFragment : Fragment() {
 
@@ -34,6 +40,8 @@ class HomeFragment : Fragment() {
     private lateinit var lottieAnimationView: LottieAnimationView
     private lateinit var speechRecognizerHelper: SpeechRecognizerHelper
     private val messages = mutableListOf<String>() // List to store chat messages
+    private var bluetoothSocket: BluetoothSocket? = null
+    private val sppUUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     // Ensure consistent scrolling behavior for both chat and voice logs
     private fun scrollToBottom() {
@@ -106,43 +114,73 @@ class HomeFragment : Fragment() {
         sendButton.setOnClickListener {
             val message = commandInput.text.toString()
             if (message.isNotBlank()) {
-                sendMessageToLog(message)
+                sendMessageToLog(message) // Log the message in the chat
+                sendMessageToESP32(message) // Send the message to ESP32
                 commandInput.text.clear()
+            } else {
+                Toast.makeText(requireContext(), "Message cannot be empty", Toast.LENGTH_SHORT).show()
             }
         }
 
         return view
     }
 
-    private fun sendMessageToESP32(message: String) {
-        val sharedPreferences = requireContext().getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
-        val deviceAddress = sharedPreferences.getString("paired_device", null)
-
-        if (deviceAddress == null) {
-            Toast.makeText(requireContext(), "No device paired. Please pair a device in Settings.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
+    private fun connectToClassicDevice(deviceAddress: String) {
         val bluetoothManager = requireContext().getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
 
-        bluetoothGatt = device.connectGatt(requireContext(), false, object : BluetoothGattCallback() {
-            override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-                if (newState == BluetoothProfile.STATE_CONNECTED) {
-                    gatt.discoverServices()
+        thread {
+            try {
+                val socket = device.createRfcommSocketToServiceRecord(sppUUID)
+                bluetoothSocket?.close() // Close any existing socket
+                bluetoothSocket = socket
+                socket.connect()
+
+                BluetoothConnectionManager.bluetoothSocket = socket // Update shared BluetoothSocket
+
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(requireContext(), "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: IOException) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(requireContext(), "Failed to connect: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+                bluetoothSocket?.close()
+                bluetoothSocket = null
+            }
+        }
+    }
+
+    private fun sendMessageToESP32(message: String) {
+        if (BluetoothConnectionManager.bluetoothSocket == null || !BluetoothConnectionManager.bluetoothSocket!!.isConnected) {
+            val sharedPreferences = requireContext().getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+            val deviceAddress = sharedPreferences.getString("paired_device", null)
+
+            if (deviceAddress == null) {
+                Toast.makeText(requireContext(), "No device paired. Please pair a device in Settings.", Toast.LENGTH_SHORT).show()
+                return
             }
 
-            override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    val service = gatt.getService(UUID.fromString("YOUR_SERVICE_UUID"))
-                    val characteristic = service.getCharacteristic(UUID.fromString("YOUR_CHARACTERISTIC_UUID"))
-                    characteristic.value = message.toByteArray()
-                    gatt.writeCharacteristic(characteristic)
+            connectToClassicDevice(deviceAddress)
+        } else {
+            bluetoothSocket = BluetoothConnectionManager.bluetoothSocket
+        }
+
+        thread {
+            try {
+                val outputStream = bluetoothSocket?.outputStream
+                outputStream?.write(message.toByteArray())
+
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(requireContext(), "Message sent: $message", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: IOException) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(requireContext(), "Failed to send message: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-        })
+        }
     }
 
     private fun checkAudioPermission(): Boolean {
@@ -165,6 +203,7 @@ class HomeFragment : Fragment() {
         if (::bluetoothGatt.isInitialized) {
             bluetoothGatt.close()
         }
+        bluetoothSocket?.close()
         speechRecognizerHelper.destroy()
     }
 
