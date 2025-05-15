@@ -26,6 +26,7 @@ import com.airbnb.lottie.LottieAnimationView
 import android.bluetooth.BluetoothSocket
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.RequiresPermission
 import java.io.IOException
 import kotlin.concurrent.thread
 import com.github.callmeqan.jarvismobile.BluetoothConnectionManager
@@ -173,7 +174,7 @@ class HomeFragment : Fragment() {
                 outputStream?.write(message.toByteArray())
 
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(requireContext(),
+                    Toast.makeText(requireContext(), "Message sent successfully!", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: IOException) {
                 Handler(Looper.getMainLooper()).post {
@@ -198,6 +199,7 @@ class HomeFragment : Fragment() {
         )
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onDestroy() {
         super.onDestroy()
         if (::bluetoothGatt.isInitialized) {
