@@ -32,15 +32,13 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "11"
     }
-    buildToolsVersion = "35.0.1"
-    ndkVersion = "29.0.13113456 rc1"
 }
 
 dependencies {
@@ -55,5 +53,12 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     // Lottie for animations
-    implementation(libs.lottie)
+    implementation("com.airbnb.android:lottie:6.0.0")
+
+    // Retrofit for HTTP requests
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    // Gson converter for JSON serialization/deserialization
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // OkHttp logging interceptor (optional, for debugging)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.10.0")
 }

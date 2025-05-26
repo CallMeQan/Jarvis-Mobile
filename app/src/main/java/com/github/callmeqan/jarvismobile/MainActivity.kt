@@ -15,6 +15,17 @@ import androidx.navigation.ui.setupWithNavController
 import com.airbnb.lottie.LottieAnimationView
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
+import android.view.View
+import android.widget.Toast
+import androidx.activity.viewModels
+import com.github.callmeqan.jarvismobile.databinding.ActivityMainBinding
+import androidx.lifecycle.ViewModelProvider
+
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ProgressBar
+import android.widget.TextView
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var speechRecognizer: SpeechRecognizer
