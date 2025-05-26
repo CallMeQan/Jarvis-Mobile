@@ -28,6 +28,16 @@ import java.io.IOException
 import kotlin.concurrent.thread
 import com.github.callmeqan.jarvismobile.BluetoothConnectionManager
 
+import androidx.lifecycle.ViewModelProvider
+
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+
 class HomeFragment : Fragment() {
 
     private lateinit var micButton: ImageButton
@@ -47,12 +57,11 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun sendMessageToLog(message: String) {
-        messages.add("You: $message")
+    private fun sendMessageToLog(message: String, role: String) {
+        messages.add(role + ": $message")
         chatLog.adapter?.notifyItemInserted(messages.size - 1)
         scrollToBottom()
     }
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -83,7 +92,7 @@ class HomeFragment : Fragment() {
         speechRecognizerHelper = SpeechRecognizerHelper(
             this,
             onVoiceCommand = { message ->
-                sendMessageToLog(message)
+                sendMessageToLog(message, role = "user")
                 lottieAnimationView.pauseAnimation() // Stop animation after processing
                 lottieAnimationView.visibility = View.INVISIBLE // Hide waveform after processing
                 speechRecognizerHelper.stopListening() // Stop listening after processing
@@ -111,8 +120,9 @@ class HomeFragment : Fragment() {
         sendButton.setOnClickListener {
             val message = commandInput.text.toString()
             if (message.isNotBlank()) {
-                sendMessageToLog(message) // Log the message in the chat
+                sendMessageToLog(message, role = "user") // Log the message in the chat
                 sendMessageToESP32(message) // Send the message to ESP32
+                sendMessage2Server(message = message, role = "user")
                 commandInput.text.clear()
             } else {
                 Toast.makeText(requireContext(), "Message cannot be empty", Toast.LENGTH_SHORT).show()
@@ -204,4 +214,50 @@ class HomeFragment : Fragment() {
     companion object {
         private const val REQUEST_RECORD_AUDIO_PERMISSION = 200
     }
-}
+
+    private fun sendMessage2Server(message: String, role: String = "user") {
+        // On below line we are creating a retrofit
+        // Builder and passing our base url
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://fd57-2405-4802-a61a-8d0-2191-a0e4-4b6b-c899.ngrok-free.app/")
+
+            // As we are sending data in json format so we have to add Gson converter factory
+            .addConverterFactory(GsonConverterFactory.create())
+
+            // At last we are building our retrofit builder.
+            .build()
+
+        // Below line is to create an instance for our retrofit api class.
+        val retrofitAPI = retrofit.create(RetrofitAPI::class.java)
+
+        // Passing data from our text fields to our modal class.
+        val chatMessage = ChatMessage(message, role)
+
+        // Calling a method to create a post and passing our modal class.
+        Toast.makeText(requireContext(), "Data: " + chatMessage.message, Toast.LENGTH_SHORT).show()
+        val call: Call<ChatMessage?>? = retrofitAPI.sendMessage2Server(chatMessage)
+
+        // On below line we are executing our method.
+        call!!.enqueue(object : Callback<ChatMessage?> {
+            override fun onResponse(call: Call<ChatMessage?>?, response: Response<ChatMessage?>) {
+                // This method is called when we get response from our api.
+                Toast.makeText(requireContext(), "Message sent to API server", Toast.LENGTH_SHORT).show()
+
+                // We are getting response from our body and passing it to our modal class.
+                val response: ChatMessage? = response.body()
+
+                // On below line we are getting our data from modal class and adding it to our string.
+                val responseString = "Response Code : " + "201" + "\n" + "message : " +response!!.message + "\n" + "role : " + response!!.role
+                sendMessageToLog(response!!.message, role = "assistant")
+
+                // Below line we are setting our string to our text view.
+                Toast.makeText(requireContext(), responseString, Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onFailure(call: Call<ChatMessage?>?, t: Throwable) {
+
+                // Setting text to our text view when we get error response from API.
+                Toast.makeText(requireContext(), "Error found : " + t.message, Toast.LENGTH_SHORT).show()
+            }
+        })
+}}
