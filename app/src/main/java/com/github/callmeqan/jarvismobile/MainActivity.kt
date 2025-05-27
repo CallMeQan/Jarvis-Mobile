@@ -6,108 +6,135 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
-import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.navigation.findNavController
-import androidx.navigation.ui.setupWithNavController
-import com.airbnb.lottie.LottieAnimationView
-import com.google.android.material.bottomnavigation.BottomNavigationView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.airbnb.lottie.compose.*
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import androidx.navigation.compose.*
 
-import android.view.View
-import android.widget.Toast
-import androidx.activity.viewModels
-import com.github.callmeqan.jarvismobile.databinding.ActivityMainBinding
-import androidx.lifecycle.ViewModelProvider
-
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ProgressBar
-import android.widget.TextView
-
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var speechRecognizer: SpeechRecognizer
-    private lateinit var lottieAnimationView: LottieAnimationView
+class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContent {
+            JarvisApp()
+        }
+    }
+}
 
-        // Set content view first
-        setContentView(R.layout.activity_main)
+@Composable
+fun JarvisApp() {
+    // System bars edge-to-edge
+    val systemUiController = rememberSystemUiController()
+    SideEffect {
+        systemUiController.setSystemBarsColor(color = MaterialTheme.colorScheme.background)
+    }
 
-        enableEdgeToEdge()
+    val navController = rememberNavController()
+    val bottomNavItems = listOf("Home", "Settings") // replace with your destinations
 
-        // Initialize LottieAnimationView
-        lottieAnimationView = findViewById(R.id.waveformAnimation)
+    // Compose state for Lottie and SpeechRecognizer
+    val context = LocalContext.current
+    var lottieSpeed by remember { mutableFloatStateOf(1f) }
+    var lottieIsPlaying by remember { mutableStateOf(false) }
+    var saidText by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
-        // Initialize SpeechRecognizer
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+    // Lottie composition
+    val composition by rememberLottieComposition(LottieCompositionSpec.Asset("waveform.json"))
+    val lottieAnimatable = animateLottieCompositionAsState(
+        composition = composition,
+        isPlaying = lottieIsPlaying,
+        speed = lottieSpeed,
+        iterations = LottieConstants.IterateForever
+    )
+
+    // SpeechRecognizer setup
+    DisposableEffect(Unit) {
+        val speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
         }
-
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                lottieAnimationView.progress = 0f // Reset animation progress
-                lottieAnimationView.playAnimation()
+                lottieIsPlaying = true
             }
-
             override fun onBeginningOfSpeech() {
-                lottieAnimationView.speed = 1.5f // Speed up animation
+                lottieSpeed = 1.5f
             }
-
             override fun onRmsChanged(rmsdB: Float) {
-                lottieAnimationView.progress = (rmsdB / 10).coerceIn(0f, 1f) // Adjust animation based on voice amplitude
             }
-
             override fun onBufferReceived(buffer: ByteArray?) {}
-
             override fun onEndOfSpeech() {
-                lottieAnimationView.pauseAnimation()
+                lottieIsPlaying = false
             }
-
             override fun onError(error: Int) {
-                Log.e("SpeechRecognizer", "Error: $error") // Log error instead of showing a toast
-                restartSpeechRecognizer(intent) // Restart SpeechRecognizer on error
+                Log.e("SpeechRecognizer", "Error: $error")
+                speechRecognizer.stopListening()
+                speechRecognizer.startListening(intent)
             }
-
             override fun onResults(results: Bundle?) {
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                Log.i("SpeechRecognizer", "You said: ${matches?.get(0)}") // Log results instead of showing a toast
-                restartSpeechRecognizer(intent) // Restart SpeechRecognizer after results
+                saidText = matches?.getOrNull(0)
+                speechRecognizer.stopListening()
+                speechRecognizer.startListening(intent)
             }
-
             override fun onPartialResults(partialResults: Bundle?) {}
-
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-
-        // ViewCompat padding fix (optional but nice)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainLayout)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-
-        // Hook up nav controller with bottom nav
-        val navController = findNavController(R.id.nav_host_fragment)
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)
-        bottomNav.setupWithNavController(navController)
-        navController.addOnDestinationChangedListener { _, destination, _ ->
-            println("Navigating to: ${destination.label}")
-        }
-    }
-
-    private fun restartSpeechRecognizer(intent: Intent) {
-        speechRecognizer.stopListening()
         speechRecognizer.startListening(intent)
+        onDispose {
+            speechRecognizer.destroy()
+        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        speechRecognizer.destroy()
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                bottomNavItems.forEach { label ->
+                    NavigationBarItem(
+                        selected = false, // You should wire selection state to navController
+                        onClick = {
+                            // navController.navigate(label)
+                        },
+                        label = { Text(label) },
+                        icon = { /* Add icons if desired */ }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            // Lottie Animation
+            LottieAnimation(
+                composition = composition,
+                progress = { lottieAnimatable.progress },
+                modifier = Modifier
+                    .size(200.dp)
+                    .align(Alignment.Center)
+            )
+
+            // Optionally show recognized speech
+            saidText?.let {
+                Text(
+                    text = "You said: $it",
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                )
+            }
+
+            // Navigation host (replace with real destinations)
+            NavHost(navController = navController, startDestination = "Home") {
+                composable("Home") { /* HomeScreen() */ }
+                composable("Settings") { /* SettingsScreen() */ }
+            }
+        }
     }
 }
