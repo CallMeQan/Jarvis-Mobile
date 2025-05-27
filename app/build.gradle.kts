@@ -53,12 +53,17 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     // Lottie for animations
-    implementation("com.airbnb.android:lottie:6.0.0")
+    implementation(libs.lottie)
 
     // Retrofit for HTTP requests
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation(libs.retrofit)
     // Gson converter for JSON serialization/deserialization
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation(libs.converter.gson)
     // OkHttp logging interceptor (optional, for debugging)
-    implementation("com.squareup.okhttp3:logging-interceptor:4.10.0")
+    implementation(libs.logging.interceptor)
+
+    implementation (libs.androidx.material3)
+    implementation (libs.androidx.navigation.compose)
+    implementation( libs.lottie.compose)
+    implementation (libs.accompanist.systemuicontroller)
 }
